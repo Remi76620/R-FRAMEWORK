@@ -16,13 +16,23 @@ RegisterCommand('setrank', function(source, args, rawCommand)
         return
     end
     
-    -- Vérifier les permissions
-    local rank = rm.getRank(player.getRankId())
-    if not rank or not rank.hasPermission('admin.accessRankManagerAndManageRank') then
+    -- Vérifier les permissions - Seuls fonda, admin ou dev peuvent changer les rangs
+    local senderRank = rm.getRank(player.getRankId())
+    if not senderRank then
         TriggerClientEvent('chat:addMessage', source, {
             color = {255, 0, 0},
             multiline = true,
-            args = {"RM-Framework", "Erreur: Vous n'avez pas la permission de changer les rangs"}
+            args = {"RM-Framework", "Erreur: Rang non trouvé"}
+        })
+        return
+    end
+    
+    local senderRankId = player.getRankId()
+    if senderRankId ~= 'fonda' and senderRankId ~= 'admin' and senderRankId ~= 'dev' then
+        TriggerClientEvent('chat:addMessage', source, {
+            color = {255, 0, 0},
+            multiline = true,
+            args = {"RM-Framework", "Erreur: Vous pas changer de rangs"}
         })
         return
     end
@@ -32,19 +42,19 @@ RegisterCommand('setrank', function(source, args, rawCommand)
         TriggerClientEvent('chat:addMessage', source, {
             color = {255, 255, 0},
             multiline = true,
-            args = {"RM-Framework", "Usage: /setrank <player_id> <rank_id>"}
+            args = {"RM-Framework", "Usage: /setrank <rmId> <rank_id>"}
         })
         return
     end
     
-    local targetId = tonumber(args[1])
+    local targetRmId = tonumber(args[1])
     local newRankId = args[2]
     
-    if not targetId then
+    if not targetRmId then
         TriggerClientEvent('chat:addMessage', source, {
             color = {255, 0, 0},
             multiline = true,
-            args = {"RM-Framework", "Erreur: ID du joueur invalide"}
+            args = {"RM-Framework", "Erreur: rmId invalide"}
         })
         return
     end
@@ -60,38 +70,70 @@ RegisterCommand('setrank', function(source, args, rawCommand)
         return
     end
     
-    -- Récupérer le joueur cible
-    local targetPlayer = rm.getPlayer(targetId)
-    if not targetPlayer then
-        TriggerClientEvent('chat:addMessage', source, {
-            color = {255, 0, 0},
-            multiline = true,
-            args = {"RM-Framework", "Erreur: Joueur avec l'ID " .. targetId .. " non trouvé"}
-        })
-        return
+    -- Vérifier la hiérarchie des rangs
+    if senderRank and targetRank then
+        if senderRank.getWeight() <= targetRank.getWeight() and senderRankId ~= 'fonda' then
+            TriggerClientEvent('chat:addMessage', source, {
+                color = {255, 0, 0},
+                multiline = true,
+                args = {"RM-Framework", "Erreur: Vous ne pouvez pas modifier un rang de poids égal ou supérieur"}
+            })
+            return
+        end
     end
     
-    -- Changer le rang
-    local oldRankId = targetPlayer.getRankId()
-    targetPlayer.setRankId(newRankId)
-    
-    -- Sauvegarder en base de données
-    MySQL.update('UPDATE `rm_players` SET `rankId` = ? WHERE `rmId` = ?', {newRankId, targetPlayer.getRmId()})
-    
-    -- Messages de confirmation
-    TriggerClientEvent('chat:addMessage', source, {
-        color = {0, 255, 0},
-        multiline = true,
-        args = {"RM-Framework", "Rang de " .. GetPlayerName(targetId) .. " changé de '" .. oldRankId .. "' vers '" .. newRankId .. "'"}
-    })
-    
-    TriggerClientEvent('chat:addMessage', targetId, {
-        color = {0, 255, 0},
-        multiline = true,
-        args = {"RM-Framework", "Votre rang a été changé vers '" .. newRankId .. "' par " .. GetPlayerName(source)}
-    })
-    
-    rm.Io.Trace("Rank changed for player " .. GetPlayerName(targetId) .. " from " .. oldRankId .. " to " .. newRankId .. " by " .. GetPlayerName(source))
+    -- Vérifier si le joueur existe en base de données
+    MySQL.query('SELECT rmId, rankId FROM rm_players WHERE rmId = ?', {targetRmId}, function(result)
+        if not result or #result == 0 then
+            TriggerClientEvent('chat:addMessage', source, {
+                color = {255, 0, 0},
+                multiline = true,
+                args = {"RM-Framework", "Erreur: Aucun joueur trouvé avec le rmId " .. targetRmId}
+            })
+            return
+        end
+        
+        local oldRankId = result[1].rankId
+        
+        -- Mettre à jour en base de données
+        MySQL.update('UPDATE rm_players SET rankId = ? WHERE rmId = ?', {newRankId, targetRmId}, function(affectedRows)
+            if affectedRows > 0 then
+                -- Mettre à jour le joueur en mémoire s'il est connecté
+                local targetPlayer = nil
+                for _, connectedPlayer in pairs(rm.Players) do
+                    if connectedPlayer.getRmId() == targetRmId then
+                        targetPlayer = connectedPlayer
+                        connectedPlayer.setRankId(newRankId)
+                        break
+                    end
+                end
+                
+                -- Messages de confirmation
+                TriggerClientEvent('chat:addMessage', source, {
+                    color = {0, 255, 0},
+                    multiline = true,
+                    args = {"RM-Framework", "Rang du joueur rmId " .. targetRmId .. " changé de '" .. oldRankId .. "' vers '" .. newRankId .. "'"}
+                })
+                
+                -- Notifier le joueur s'il est connecté
+                if targetPlayer then
+                    TriggerClientEvent('chat:addMessage', targetPlayer.getSource(), {
+                        color = {0, 255, 0},
+                        multiline = true,
+                        args = {"RM-Framework", "Votre rang a été changé vers '" .. newRankId .. "' par " .. GetPlayerName(source)}
+                    })
+                end
+                
+                rm.Io.Trace("Rank changed for player rmId " .. targetRmId .. " from " .. oldRankId .. " to " .. newRankId .. " by " .. GetPlayerName(source))
+            else
+                TriggerClientEvent('chat:addMessage', source, {
+                    color = {255, 0, 0},
+                    multiline = true,
+                    args = {"RM-Framework", "Erreur: Impossible de mettre à jour le rang"}
+                })
+            end
+        end)
+    end)
 end, false)
 
 -- Commande pour se donner le rang fondateur (pour les tests)
@@ -216,13 +258,13 @@ RegisterCommand('ranks', function(source, args, rawCommand)
         return
     end
     
-    -- Vérifier les permissions
-    local rank = rm.getRank(player.getRankId())
-    if not rank or not rank.hasPermission('admin.accessRankManagerAndManageRank') then
+    -- Vérifier les permissions - Seuls fonda, admin ou dev peuvent voir les rangs
+    local senderRankId = player.getRankId()
+    if senderRankId ~= 'fonda' and senderRankId ~= 'admin' and senderRankId ~= 'dev' then
         TriggerClientEvent('chat:addMessage', source, {
             color = {255, 0, 0},
             multiline = true,
-            args = {"RM-Framework", "Erreur: Vous n'avez pas la permission de voir les rangs"}
+            args = {"RM-Framework", "Erreur: Seuls les fonda, admin ou dev peuvent voir les rangs"}
         })
         return
     end
@@ -256,13 +298,13 @@ RegisterCommand('rankperms', function(source, args, rawCommand)
         return
     end
     
-    -- Vérifier les permissions
-    local rank = rm.getRank(player.getRankId())
-    if not rank or not rank.hasPermission('admin.accessRankManagerAndManageRank') then
+    -- Vérifier les permissions - Seuls fonda, admin ou dev peuvent voir les permissions
+    local senderRankId = player.getRankId()
+    if senderRankId ~= 'fonda' and senderRankId ~= 'admin' and senderRankId ~= 'dev' then
         TriggerClientEvent('chat:addMessage', source, {
             color = {255, 0, 0},
             multiline = true,
-            args = {"RM-Framework", "Erreur: Vous n'avez pas la permission de voir les permissions"}
+            args = {"RM-Framework", "Erreur: Seuls les fonda, admin ou dev peuvent voir les permissions"}
         })
         return
     end
