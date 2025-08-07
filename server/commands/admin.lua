@@ -116,12 +116,15 @@ RegisterCommand('setrank', function(source, args, rawCommand)
                 })
                 
                 -- Notifier le joueur s'il est connecté
-                if targetPlayer then
-                    TriggerClientEvent('chat:addMessage', targetPlayer.getSource(), {
-                        color = {0, 255, 0},
-                        multiline = true,
-                        args = {"RM-Framework", "Votre rang a été changé vers '" .. newRankId .. "' par " .. GetPlayerName(source)}
-                    })
+                if targetPlayer and targetPlayer.getSource then
+                    local targetSource = targetPlayer.getSource()
+                    if targetSource then
+                        TriggerClientEvent('chat:addMessage', targetSource, {
+                            color = {0, 255, 0},
+                            multiline = true,
+                            args = {"RM-Framework", "Votre rang a été changé vers '" .. newRankId .. "' par " .. GetPlayerName(source)}
+                        })
+                    end
                 end
                 
                 rm.Io.Trace("Rank changed for player rmId " .. targetRmId .. " from " .. oldRankId .. " to " .. newRankId .. " by " .. GetPlayerName(source))
@@ -134,48 +137,6 @@ RegisterCommand('setrank', function(source, args, rawCommand)
             end
         end)
     end)
-end, false)
-
--- Commande pour se donner le rang fondateur (pour les tests)
-RegisterCommand('setfonda', function(source, args, rawCommand)
-    if source == 0 then return end
-    
-    local player = rm.getPlayer(source)
-    if not player then
-        TriggerClientEvent('chat:addMessage', source, {
-            color = {255, 0, 0},
-            multiline = true,
-            args = {"RM-Framework", "Erreur: Joueur non trouvé"}
-        })
-        return
-    end
-    
-    -- Vérifier si le rang fondateur existe
-    local fondaRank = rm.getRank('fonda')
-    if not fondaRank then
-        TriggerClientEvent('chat:addMessage', source, {
-            color = {255, 0, 0},
-            multiline = true,
-            args = {"RM-Framework", "Erreur: Rang 'fonda' non trouvé"}
-        })
-        return
-    end
-    
-    -- Changer le rang
-    local oldRankId = player.getRankId()
-    player.setRankId('fonda')
-    
-    -- Sauvegarder en base de données
-    MySQL.update('UPDATE `rm_players` SET `rankId` = ? WHERE `rmId` = ?', {'fonda', player.getRmId()})
-    
-    -- Message de confirmation
-    TriggerClientEvent('chat:addMessage', source, {
-        color = {0, 255, 0},
-        multiline = true,
-        args = {"RM-Framework", "Votre rang a été changé vers 'fonda' (Fondateur)"}
-    })
-    
-    rm.Io.Trace("Player " .. GetPlayerName(source) .. " set to fonda rank")
 end, false)
 
 -- Commande pour se retirer le rang fondateur (retourner en user)
