@@ -29,17 +29,17 @@
   - [ ] Système de messages privés
   - [ ] Système de canaux
 
-- [ ] **Commandes de Développement** - Outils dev
-  - [ ] `/dv` - Delete Vehicle
-  - [ ] `/car` - Spawn Vehicle
-  - [ ] `/tp` - Teleport
-  - [ ] `/tpm` - Teleport to Marker
-  - [ ] `/noclip` - No Clip
-  - [ ] `/godmode` - God Mode
-  - [ ] `/invisible` - Invisible
-  - [ ] `/revive` - Revive Player
-  - [ ] `/heal` - Heal Player
-  - [ ] `/armor` - Give Armor
+- [x] **Commandes de Développement** - Outils dev ✅
+  - [x] `/dv` - Delete Vehicle
+  - [x] `/car` - Spawn Vehicle
+  - [x] `/tp` - Teleport
+  - [x] `/tpm` - Teleport to Marker
+  - [x] `/noclip` - No Clip
+  - [x] `/godmode` - God Mode
+  - [x] `/invisible` - Invisible
+  - [x] `/revive` - Revive Player
+  - [x] `/heal` - Heal Player
+  - [x] `/armor` - Give Armor
 
 - [ ] **Système de Bans** - Test et finalisation
   - [ ] Vérifier si rm_bans fonctionne correctement
